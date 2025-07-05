@@ -7,7 +7,7 @@ import requests
 from timelock import Timelock
 
 # --- Configuration ---
-FILENAME = "5DhoYw2EyGGqcXt3Cgnpcaf2VRCJcJYJntpwyQryphTgmYWs"
+FILENAME = "5Dw5G2ECqFDfZFC48yKAiuuoZB81xKdYQ1ZuNVKw4ThgYywZ"
 LOCK_TIME_SECONDS = 30
 FEATURE_LENGTH = 100
 
@@ -34,9 +34,29 @@ def generate_and_encrypt():
     # 2. Determine future Drand round
     print(f"Fetching Drand beacon info to target a round ~{LOCK_TIME_SECONDS}s in the future...")
     try:
-        info = requests.get(f"{DRAND_API}/beacons/{DRAND_BEACON_ID}/info", timeout=10).json()
+        response = requests.get(f"{DRAND_API}/beacons/{DRAND_BEACON_ID}/info", timeout=10)
+        response.raise_for_status()
+        info = response.json()
+        
+        # Validate required keys exist
+        if "genesis_time" not in info or "period" not in info:
+            raise ValueError(f"Drand info missing required keys. Got: {list(info.keys())}")
+        
+        # Validate period is not zero
+        if info["period"] <= 0:
+            raise ValueError(f"Invalid Drand period: {info['period']}")
+        
         future_time = time.time() + LOCK_TIME_SECONDS
-        round_num = int((future_time - info["genesis_time"]) // info["period"])
+        time_diff = future_time - info["genesis_time"]
+        
+        if time_diff <= 0:
+            raise ValueError(f"Future time {future_time} is before genesis time {info['genesis_time']}")
+            
+        round_num = int(time_diff // info["period"])
+        
+        if round_num <= 0:
+            raise ValueError(f"Calculated invalid round: {round_num}")
+            
         print(f"Targeting Drand round: {round_num}")
     except Exception as e:
         print(f"❌ Error: Could not fetch Drand info. {e}")

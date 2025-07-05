@@ -12,3 +12,6 @@ matplotlib
 pandas
 seaborn
 joblib
+yfinance
+ccxt
+pandas-ta
